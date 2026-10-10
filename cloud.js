@@ -29,7 +29,7 @@ async function pushCloud(){
   if(m.events[ev.id])continue;
   const changeId=ev.changeId?m.changes[ev.changeId]:null, projectId=m.projects[ev.projectId];
   if(!projectId)continue;
-  const type=["created","link_created","pending","approved","declined","completed"].includes(ev.type)?ev.type:"created";
+  const type=["created","link_created","approved","declined","completed"].includes(ev.type)?ev.type:"created";
   const {data,error}=await client.from("scopeproof_approval_events").insert({owner_id:uid,project_id:projectId,change_request_id:changeId,event_type:type,note:ev.note||""}).select("id").single();
   if(error)throw error;m.events[ev.id]=data.id;saveMap(m,uid);
  }
