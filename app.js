@@ -9,7 +9,7 @@ const money=(n,c="USD")=>{try{return new Intl.NumberFormat(undefined,{style:"cur
 const prettyDate=v=>v?new Date(v+"T12:00:00").toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}):"No date set";
 const stamp=v=>new Date(v).toLocaleString(undefined,{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
 const projectOf=pid=>state.projects.find(p=>p.id===pid);
-const statusLabel=s=>({pending:"Pending approval",approved:"Approved",declined:"Declined",completed:"Completed"}[s]||s);
+const statusLabel=s=>({pending:"Pending approval",approved:"Approved",declined:"Declined",completed:"Completed",link_created:"Client approval link created",created:"Record created"}[s]||s);
 const statusClass=s=>["pending","approved","declined","completed"].includes(s)?s:"active";
 function sampleState(){
 const p1={id:"p_sample_web",name:"Website redesign",client:"Acme Studio",currency:"USD",price:500,dueDate:"2026-11-15",scope:"Included: 5 responsive pages, contact form, basic on-page SEO, and 2 rounds of revisions.\nNot included: extra pages, copywriting, paid integrations, or ongoing maintenance.",notes:"Sample project — replace with your own data.",createdAt:"2026-10-08T10:00:00.000Z",status:"active"};
