@@ -38,11 +38,29 @@ async function pushCloud(){
 }
 async function sync(){
  const {session,m,state}=await pushCloud();
- // Pull server-side decisions so client approvals show up in the owner workspace.
- const {data:rows,error}=await client.from("scopeproof_change_requests").select("id,status,decided_at,decision_note").eq("owner_id",session.user.id);
- if(error)throw error;
- for(const c of state.changes){const id=m.changes[c.id],remote=rows.find(r=>r.id===id);if(remote&&remote.status!==c.status){const prior=c.status;c.status=remote.status;c.history=c.history||[];if(remote.decided_at)c.history.push({status:remote.status,at:remote.decided_at,note:remote.decision_note||"Client decision recorded online."});state.events.push({id:"cloud_"+id+"_"+remote.status,type:remote.status,projectId:c.projectId,changeId:c.id,at:remote.decided_at||new Date().toISOString(),note:"Client decision synchronized from cloud ("+prior+" → "+remote.status+")."});}}
- window.ScopeProofApp.save();window.ScopeProofApp.renderAll();return session;
+ const {data:remoteProjects,error:projectError}=await client.from("scopeproof_projects").select("*").eq("owner_id",session.user.id);
+ if(projectError)throw projectError;
+ for(const p of (remoteProjects||[])){
+  let localId=Object.keys(m.projects).find(k=>m.projects[k]===p.id)||("p_cloud_"+p.id);
+  m.projects[localId]=p.id;
+  const local={id:localId,name:p.name,client:p.client_name||"",currency:p.currency||"USD",price:Number(p.original_price||0),dueDate:p.due_date||"",scope:p.original_scope||"",notes:p.notes||"",createdAt:p.created_at||new Date().toISOString(),status:"active"};
+  const ix=state.projects.findIndex(x=>x.id===localId);if(ix>=0)state.projects[ix]=local;else state.projects.push(local);
+ }
+ saveMap(m);
+ const {data:remoteChanges,error:changeError}=await client.from("scopeproof_change_requests").select("*").eq("owner_id",session.user.id);
+ if(changeError)throw changeError;
+ for(const c of (remoteChanges||[])){
+  const projectLocalId=Object.keys(m.projects).find(k=>m.projects[k]===c.project_id);
+  if(!projectLocalId)continue;
+  let localId=Object.keys(m.changes).find(k=>m.changes[k]===c.id)||("c_cloud_"+c.id);
+  m.changes[localId]=c.id;
+  const local=state.changes.find(x=>x.id===localId);
+  const history=local?.history||[{status:"pending",at:c.created_at||new Date().toISOString(),note:"Synced from cloud."}];
+  if(local&&local.status!==c.status&&c.decided_at)history.push({status:c.status,at:c.decided_at,note:c.decision_note||"Client decision recorded online."});
+  const converted={id:localId,projectId:projectLocalId,title:c.title,description:c.description||"",price:Number(c.additional_price||0),hours:Number(c.estimated_hours||0),dueDate:c.revised_due_date||"",requestDate:c.requested_on||"",status:c.status,createdAt:c.created_at||new Date().toISOString(),history};
+  const ix=state.changes.findIndex(x=>x.id===localId);if(ix>=0)state.changes[ix]=converted;else state.changes.push(converted);
+ }
+ saveMap(m);state.sample=false;window.ScopeProofApp.save();window.ScopeProofApp.renderAll();return session;
 }
 function openAuth(){ $("#cloudAuthMessage").textContent="";$("#cloudAuthDialog").showModal(); }
 async function signUp(){const f=new FormData($("#cloudAuthForm")),email=String(f.get("email")||"").trim(),password=String(f.get("password")||"");if(!email||password.length<8){say("Enter a valid email and a password of at least 8 characters.");return;}const {data,error}=await client.auth.signUp({email,password});if(error)throw error;say(data.session?"Account created and signed in.":"Account created. Check your email for a confirmation link, then sign in.");}
