@@ -26,7 +26,7 @@ async function pushCloud(){
   if(dbid){const safeRow={...row};delete safeRow.status;const {error}=await client.from("scopeproof_change_requests").update(safeRow).eq("id",dbid);if(error)throw error;}
   else{const {data,error}=await client.from("scopeproof_change_requests").insert(row).select("id").single();if(error)throw error;dbid=data.id;m.changes[c.id]=dbid;saveMap(m);}
  }
- for(const ev of state.events.filter(x=>!String(x.id).startsWith("e"))){
+ for(const ev of state.events.filter(x=>!["e1","e2","e3","e4"].includes(String(x.id)))){
   if(m.events[ev.id])continue;
   const changeId=ev.changeId?m.changes[ev.changeId]:null, projectId=m.projects[ev.projectId];
   if(!projectId)continue;
