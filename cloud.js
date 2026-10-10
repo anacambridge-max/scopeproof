@@ -16,8 +16,8 @@ async function pushCloud(){
  const uid=session.user.id;let state=window.ScopeProofApp?.getState();if(!state)throw new Error("App is still loading.");const previousUser=localStorage.getItem("scopeproof_active_cloud_user");if(previousUser&&previousUser!==uid){state.projects=[];state.changes=[];state.events=[];state.sample=false;window.ScopeProofApp.save();window.ScopeProofApp.renderAll();}localStorage.setItem("scopeproof_active_cloud_user",uid);const m=map(uid);
  for(const p of state.projects.filter(x=>!String(x.id).startsWith("p_sample_"))){
   let dbid=m.projects[p.id];const row={owner_id:uid,name:p.name,client_name:p.client||"",currency:p.currency||"USD",original_price:Number(p.price||0),original_scope:p.scope||"",notes:p.notes||"",due_date:p.dueDate||null,updated_at:new Date().toISOString()};
-  if(dbid){const {error}=await client.from("scopeproof_projects").update(row).eq("id",dbid);if(error)throw error;}
-  else{const {data,error}=await client.from("scopeproof_projects").insert(row).select("id").single();if(error)throw error;dbid=data.id;m.projects[p.id]=dbid;saveMap(m,uid);}
+  if(dbid){const {data,error}=await client.from("scopeproof_projects").update(row).eq("id",dbid).eq("owner_id",uid).select("id").maybeSingle();if(error)throw error;if(!data){const {data:match,error:matchError}=await client.from("scopeproof_projects").select("id").eq("owner_id",uid).eq("name",row.name).eq("client_name",row.client_name).eq("original_price",row.original_price).eq("original_scope",row.original_scope).limit(1).maybeSingle();if(matchError)throw matchError;if(match){dbid=match.id;m.projects[p.id]=dbid;}else{const {data:created,error:createError}=await client.from("scopeproof_projects").insert(row).select("id").single();if(createError)throw createError;dbid=created.id;m.projects[p.id]=dbid;}saveMap(m,uid);}}
+  else{const {data:match,error:matchError}=await client.from("scopeproof_projects").select("id").eq("owner_id",uid).eq("name",row.name).eq("client_name",row.client_name).eq("original_price",row.original_price).eq("original_scope",row.original_scope).limit(1).maybeSingle();if(matchError)throw matchError;if(match){dbid=match.id;m.projects[p.id]=dbid;saveMap(m,uid);}else{const {data,error}=await client.from("scopeproof_projects").insert(row).select("id").single();if(error)throw error;dbid=data.id;m.projects[p.id]=dbid;saveMap(m,uid);}}
  }
  for(const c of state.changes.filter(x=>!String(x.id).startsWith("c_sample_"))){
   const dbProject=m.projects[c.projectId];if(!dbProject)continue;
@@ -46,6 +46,7 @@ async function sync(){
   const ix=state.projects.findIndex(x=>x.id===localId);if(ix>=0)state.projects[ix]=local;else state.projects.push(local);
  }
  saveMap(m,uid);
+ const remoteProjectIds=new Set((remoteProjects||[]).map(p=>p.id));const seenProjectIds=new Set();state.projects=state.projects.filter(p=>{const mapped=m.projects[p.id];if(!mapped)return true;if(!remoteProjectIds.has(mapped))return false;if(seenProjectIds.has(mapped))return false;seenProjectIds.add(mapped);return true;});
  const {data:remoteChanges,error:changeError}=await client.from("scopeproof_change_requests").select("*").eq("owner_id",session.user.id);
  if(changeError)throw changeError;
  for(const c of (remoteChanges||[])){
