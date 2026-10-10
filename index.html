@@ -21,8 +21,11 @@
       <button class="nav-item" data-view="history"><span>◷</span> Approval history</button>
     </nav>
     <div class="sidebar-bottom">
-      <div class="local-pill"><span class="dot"></span> Local demo mode</div>
-      <p>Your data stays in this browser. No account or server is connected.</p>
+      <div class="local-pill" id="cloudStatusPill"><span class="dot"></span> Local mode</div>
+      <p id="cloudStatusText">Sign in to create real client approval links and store projects in the cloud.</p>
+      <button class="text-button" id="cloudAccountBtn">Sign in / Create account</button>
+      <button class="text-button" id="cloudSyncBtn">Sync to cloud</button>
+      <button class="text-button" id="cloudSignOutBtn" hidden>Sign out</button>
       <button class="text-button" id="exportDataBtn">Export backup (JSON)</button>
       <button class="text-button danger-text" id="resetDataBtn">Reset demo data</button>
     </div>
@@ -123,6 +126,18 @@
     <div id="approvalContent"></div>
   </dialog>
 
+  <dialog id="cloudAuthDialog" class="modal">
+    <form id="cloudAuthForm" method="dialog">
+      <div class="modal-header"><div><span class="mini-label">SCOPEPROOF CLOUD</span><h2>Sign in or create account</h2><p>Use your email and a password of at least 8 characters.</p></div><button type="button" class="icon-button" data-close="cloudAuthDialog" aria-label="Close">×</button></div>
+      <div class="form-grid">
+        <label class="full">Email<input type="email" name="email" required autocomplete="email"></label>
+        <label class="full">Password<input type="password" name="password" minlength="8" required autocomplete="current-password"></label>
+      </div>
+      <p id="cloudAuthMessage" class="prose" aria-live="polite"></p>
+      <div class="modal-actions"><button type="button" class="button secondary" data-close="cloudAuthDialog">Cancel</button><button class="button secondary" type="button" id="cloudSignUpBtn">Create account</button><button class="button primary" type="submit">Sign in</button></div>
+    </form>
+  </dialog>
+
   <dialog id="infoDialog" class="modal">
     <div class="modal-header"><div><span class="mini-label">IMPORTANT</span><h2>Data & limitations</h2></div><button type="button" class="icon-button" data-close="infoDialog" aria-label="Close">×</button></div>
     <div class="prose">
@@ -135,6 +150,8 @@
   </dialog>
 
   <template id="emptyTemplate"><div class="empty-state"><div class="empty-icon">✳</div><h3>Nothing here yet</h3><p>Create a project to start recording your scope and changes.</p></div></template>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
+  <script src="cloud.js"></script>
 </body>
 </html>
