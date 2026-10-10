@@ -79,7 +79,7 @@ async function sync(){
   if(!change)continue;
   const remoteHistory=(remoteEvents||[])
    .filter(ev=>ev.change_request_id===c.id)
-   .map(ev=>({status:ev.event_type==="created"?"pending":ev.event_type,at:ev.created_at,note:ev.note||"Status recorded."}))
+   .map(ev=>({status:ev.event_type==="created"?"pending":ev.event_type,at:ev.created_at,note:ev.event_type==="created"?"Change request recorded in ScopeProof. Creating a request does not notify the client.":(ev.note||"Status recorded.")}))
    .sort((a,b)=>String(a.at).localeCompare(String(b.at)));
   if(remoteHistory.length){
    const seen=new Set();
