@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>ScopeProof — Scope & Change Control</title>
+  <meta name="description" content="Track project scope, change requests, pricing, and approval history.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#" aria-label="ScopeProof home">
+      <span class="brand-mark">S</span>
+      <span><strong>ScopeProof</strong><small>Scope, made clear.</small></span>
+    </a>
+    <nav class="nav" aria-label="Main navigation">
+      <button class="nav-item active" data-view="dashboard"><span>▦</span> Overview</button>
+      <button class="nav-item" data-view="projects"><span>▤</span> Projects</button>
+      <button class="nav-item" data-view="changes"><span>↗</span> Change requests</button>
+      <button class="nav-item" data-view="history"><span>◷</span> Approval history</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="local-pill"><span class="dot"></span> Local demo mode</div>
+      <p>Your data stays in this browser. No account or server is connected.</p>
+      <button class="text-button" id="exportDataBtn">Export backup (JSON)</button>
+      <button class="text-button danger-text" id="resetDataBtn">Reset demo data</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow" id="eyebrow">WORKSPACE / OVERVIEW</div>
+        <h1 id="pageTitle">Good work deserves a clear scope.</h1>
+        <p class="subhead" id="pageSubtitle">Keep the original agreement and every change in one place.</p>
+      </div>
+      <button class="button primary" id="topNewProjectBtn">＋ New project</button>
+    </header>
+
+    <section id="dashboardView" class="view active">
+      <div class="notice">
+        <span class="notice-icon">i</span>
+        <div><strong>Prototype mode</strong><p>This MVP stores data in your browser. Approval buttons are simulated locally; they do not create legally verified signatures or shared client approvals.</p></div>
+      </div>
+      <div class="metric-grid">
+        <article class="metric-card"><span class="metric-label">Active projects</span><strong id="metricProjects">0</strong><span class="metric-foot">Projects in progress</span></article>
+        <article class="metric-card"><span class="metric-label">Pending approvals</span><strong id="metricPending">0</strong><span class="metric-foot">Change requests awaiting a decision</span></article>
+        <article class="metric-card"><span class="metric-label">Approved extra work</span><strong id="metricApprovedValue">$0</strong><span class="metric-foot">Approved change-request value</span></article>
+        <article class="metric-card"><span class="metric-label">Original project value</span><strong id="metricOriginalValue">$0</strong><span class="metric-foot">Across all projects</span></article>
+      </div>
+      <div class="content-grid">
+        <section class="panel">
+          <div class="panel-heading"><div><h2>Recent projects</h2><p>Your active client work at a glance.</p></div><button class="link-button" data-go="projects">View all →</button></div>
+          <div id="recentProjects" class="project-list"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading"><div><h2>Needs attention</h2><p>Requests that still need a decision.</p></div></div>
+          <div id="needsAttention" class="attention-list"></div>
+        </section>
+      </div>
+      <section class="panel quick-panel">
+        <div><span class="mini-label">THE SCOPEPROOF WORKFLOW</span><h2>Agree. Change. Record.</h2><p>Capture the original deliverables, price each extra request, then keep a clear decision history.</p></div>
+        <div class="workflow"><div><b>01</b><span>Define scope</span></div><i>→</i><div><b>02</b><span>Price changes</span></div><i>→</i><div><b>03</b><span>Record decision</span></div></div>
+      </section>
+    </section>
+
+    <section id="projectsView" class="view">
+      <div class="section-toolbar"><div><h2>Projects</h2><p>Store what was originally agreed with each client.</p></div><button class="button primary" id="newProjectBtn">＋ Create project</button></div>
+      <div id="projectsList" class="cards-grid"></div>
+    </section>
+
+    <section id="changesView" class="view">
+      <div class="section-toolbar"><div><h2>Change requests</h2><p>Price and track work that falls outside the original scope.</p></div><button class="button primary" id="newChangeBtn">＋ New request</button></div>
+      <div class="filters"><input id="changeSearch" type="search" placeholder="Search requests or projects…"><select id="changeStatusFilter"><option value="all">All statuses</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="declined">Declined</option><option value="completed">Completed</option></select></div>
+      <div id="changesList" class="table-wrap"></div>
+    </section>
+
+    <section id="historyView" class="view">
+      <div class="section-toolbar"><div><h2>Approval history</h2><p>A timeline of decisions recorded in this browser.</p></div><button class="button secondary" id="historyReportBtn">Export history PDF</button></div>
+      <div id="historyList" class="timeline"></div>
+    </section>
+    <footer class="footer"><span>ScopeProof MVP</span><span>Local prototype · Not legal advice · <button id="privacyInfoBtn" class="inline-link">Data & limitations</button></span></footer>
+  </main>
+
+  <dialog id="projectDialog" class="modal">
+    <form id="projectForm" method="dialog">
+      <div class="modal-header"><div><span class="mini-label">PROJECT SETUP</span><h2>Create a project</h2><p>Record the baseline before extra work begins.</p></div><button type="button" class="icon-button" data-close="projectDialog" aria-label="Close">×</button></div>
+      <div class="form-grid">
+        <label class="full">Project name *<input required name="name" maxlength="100" placeholder="e.g. Website redesign"></label>
+        <label>Client / company<input name="client" maxlength="100" placeholder="e.g. Acme Studio"></label>
+        <label>Currency<select name="currency"><option value="USD">USD — $</option><option value="GBP">GBP — £</option><option value="EUR">EUR — €</option><option value="CAD">CAD — C$</option><option value="AUD">AUD — A$</option><option value="INR">INR — ₹</option></select></label>
+        <label>Original project price *<input required name="price" type="number" min="0" step="0.01" placeholder="500"></label>
+        <label>Due date<input name="dueDate" type="date"></label>
+        <label class="full">Original scope / deliverables *<textarea required name="scope" rows="4" maxlength="4000" placeholder="List what is included, revision limits, exclusions, and deliverables…"></textarea></label>
+        <label class="full">Notes (optional)<textarea name="notes" rows="2" maxlength="2000" placeholder="Any context to remember"></textarea></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="button secondary" data-close="projectDialog">Cancel</button><button class="button primary" type="submit">Save project</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="changeDialog" class="modal">
+    <form id="changeForm" method="dialog">
+      <div class="modal-header"><div><span class="mini-label">SCOPE CHANGE</span><h2>New change request</h2><p>Document the request and its impact before starting the work.</p></div><button type="button" class="icon-button" data-close="changeDialog" aria-label="Close">×</button></div>
+      <div class="form-grid">
+        <label class="full">Project *<select required name="projectId" id="changeProjectSelect"></select></label>
+        <label class="full">Request title *<input required name="title" maxlength="120" placeholder="e.g. Add three landing pages"></label>
+        <label class="full">What changed? *<textarea required name="description" rows="3" maxlength="3000" placeholder="Describe the requested work and why it is outside the original scope…"></textarea></label>
+        <label>Additional price *<input required name="price" type="number" min="0" step="0.01" placeholder="150"></label>
+        <label>Extra hours (estimate)<input name="hours" type="number" min="0" step="0.25" placeholder="3"></label>
+        <label>Revised due date (optional)<input name="dueDate" type="date"></label>
+        <label>Request received on<input name="requestDate" type="date"></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="button secondary" data-close="changeDialog">Cancel</button><button class="button primary" type="submit">Save request</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="detailDialog" class="modal wide-modal">
+    <div id="detailContent"></div>
+  </dialog>
+
+  <dialog id="approvalDialog" class="modal">
+    <div id="approvalContent"></div>
+  </dialog>
+
+  <dialog id="infoDialog" class="modal">
+    <div class="modal-header"><div><span class="mini-label">IMPORTANT</span><h2>Data & limitations</h2></div><button type="button" class="icon-button" data-close="infoDialog" aria-label="Close">×</button></div>
+    <div class="prose">
+      <p><strong>Local-only prototype:</strong> project information is stored in this browser's local storage. Clearing browser data or switching devices may remove or hide it. Export JSON backups regularly.</p>
+      <p><strong>Client approvals are simulated:</strong> the approval preview and approve/decline buttons change only the local demo data. They do not send a link to a client, verify identity, collect a legally verified signature, or create a tamper-proof audit log.</p>
+      <p><strong>For real client-facing approvals:</strong> add a backend/database, secure random approval tokens, server-side timestamps, access controls, audit logging, and a published privacy policy. Never store confidential client material in this public prototype.</p>
+      <p><strong>Not legal advice:</strong> consult a qualified professional for contract wording and electronic-signature requirements in your jurisdiction.</p>
+    </div>
+    <div class="modal-actions"><button class="button primary" data-close="infoDialog">Understood</button></div>
+  </dialog>
+
+  <template id="emptyTemplate"><div class="empty-state"><div class="empty-icon">✳</div><h3>Nothing here yet</h3><p>Create a project to start recording your scope and changes.</p></div></template>
+  <script src="app.js"></script>
+</body>
+</html>
