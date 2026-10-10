@@ -15,18 +15,18 @@ async function pushCloud(){
  const session=await current();if(!session)throw new Error("Sign in first.");
  const state=window.ScopeProofApp?.getState();if(!state)throw new Error("App is still loading.");
  const m=map(),uid=session.user.id;
- for(const p of state.projects){
+ for(const p of state.projects.filter(x=>!String(x.id).startsWith("p_sample_"))){
   let dbid=m.projects[p.id];const row={owner_id:uid,name:p.name,client_name:p.client||"",currency:p.currency||"USD",original_price:Number(p.price||0),original_scope:p.scope||"",notes:p.notes||"",due_date:p.dueDate||null,updated_at:new Date().toISOString()};
   if(dbid){const {error}=await client.from("scopeproof_projects").update(row).eq("id",dbid);if(error)throw error;}
   else{const {data,error}=await client.from("scopeproof_projects").insert(row).select("id").single();if(error)throw error;dbid=data.id;m.projects[p.id]=dbid;saveMap(m);}
  }
- for(const c of state.changes){
+ for(const c of state.changes.filter(x=>!String(x.id).startsWith("c_sample_"))){
   const dbProject=m.projects[c.projectId];if(!dbProject)continue;
   let dbid=m.changes[c.id];const row={owner_id:uid,project_id:dbProject,title:c.title,description:c.description||"",additional_price:Number(c.price||0),estimated_hours:Number(c.hours||0),revised_due_date:c.dueDate||null,requested_on:c.requestDate||new Date().toISOString().slice(0,10),status:["pending","approved","declined","completed"].includes(c.status)?c.status:"pending",updated_at:new Date().toISOString()};
   if(dbid){const safeRow={...row};delete safeRow.status;const {error}=await client.from("scopeproof_change_requests").update(safeRow).eq("id",dbid);if(error)throw error;}
   else{const {data,error}=await client.from("scopeproof_change_requests").insert(row).select("id").single();if(error)throw error;dbid=data.id;m.changes[c.id]=dbid;saveMap(m);}
  }
- for(const ev of state.events){
+ for(const ev of state.events.filter(x=>!String(x.id).startsWith("e"))){
   if(m.events[ev.id])continue;
   const changeId=ev.changeId?m.changes[ev.changeId]:null, projectId=m.projects[ev.projectId];
   if(!projectId)continue;
