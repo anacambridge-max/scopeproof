@@ -71,6 +71,21 @@ async function sync(){
   m.events[eventId]=ev.id;
   if(!state.events.some(x=>x.id===eventId))state.events.push({id:eventId,type:ev.event_type,projectId:projectLocalId,changeId:changeLocalId||null,at:ev.created_at,note:ev.note||""});
  }
+ // Rebuild each synced change timeline from authoritative cloud audit events.
+ for(const c of (remoteChanges||[])){
+  const localId=Object.keys(m.changes).find(k=>m.changes[k]===c.id);
+  if(!localId)continue;
+  const change=state.changes.find(x=>x.id===localId);
+  if(!change)continue;
+  const remoteHistory=(remoteEvents||[])
+   .filter(ev=>ev.change_request_id===c.id)
+   .map(ev=>({status:ev.event_type==="created"?"pending":ev.event_type,at:ev.created_at,note:ev.note||"Status recorded."}))
+   .sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+  if(remoteHistory.length){
+   const seen=new Set();
+   change.history=remoteHistory.filter(h=>{const key=[h.status,h.at,h.note].join("|");if(seen.has(key))return false;seen.add(key);return true;});
+  }
+ }
  state.projects=state.projects.filter(p=>!String(p.id).startsWith("p_sample_"));state.changes=state.changes.filter(c=>!String(c.id).startsWith("c_sample_"));state.events=state.events.filter(e=>!["e1","e2","e3","e4"].includes(String(e.id))&&!String(e.projectId||"").startsWith("p_sample_"));saveMap(m,uid);state.sample=false;window.ScopeProofApp.save();window.ScopeProofApp.renderAll();const notice=document.querySelector(".notice");if(notice){const h=notice.querySelector("strong"),p=notice.querySelector("p");if(h)h.textContent="Cloud sync ready";if(p)p.textContent="Your project data has synced to your account. Changes are synced when you use Sync to cloud; create a client approval link only after syncing."; }return session;
 }
 function openAuth(){ $("#cloudAuthMessage").textContent="";$("#cloudAuthDialog").showModal(); }
