@@ -52,7 +52,7 @@ async function sync(){
  for(const c of (remoteChanges||[])){
   const projectLocalId=Object.keys(m.projects).find(k=>m.projects[k]===c.project_id);
   if(!projectLocalId)continue;
-  let localId=Object.keys(m.changes).find(k=>m.changes[k]===c.id)||("c_cloud_"+c.id);
+  let localId=state.changes.find(x=>m.changes[x.id]===c.id)?.id||Object.keys(m.changes).find(k=>m.changes[k]===c.id)||("c_cloud_"+c.id);
   m.changes[localId]=c.id;
   const local=state.changes.find(x=>x.id===localId);
   const history=local?.history||[{status:"pending",at:c.created_at||new Date().toISOString(),note:"Synced from cloud."}];
@@ -64,16 +64,16 @@ async function sync(){
  if(eventError)throw eventError;
  for(const ev of (remoteEvents||[])){
   const localEventId=Object.keys(m.events).find(k=>m.events[k]===ev.id);
-  const changeLocalId=ev.change_request_id?Object.keys(m.changes).find(k=>m.changes[k]===ev.change_request_id):null;
+  const changeLocalId=ev.change_request_id?(state.changes.find(x=>m.changes[x.id]===ev.change_request_id)?.id||Object.keys(m.changes).find(k=>m.changes[k]===ev.change_request_id)||null):null;
   const projectLocalId=Object.keys(m.projects).find(k=>m.projects[k]===ev.project_id);
   if(!projectLocalId)continue;
   const eventId=localEventId||("e_cloud_"+ev.id);
   m.events[eventId]=ev.id;
-  if(!state.events.some(x=>x.id===eventId))state.events.push({id:eventId,type:ev.event_type,projectId:projectLocalId,changeId:changeLocalId||null,at:ev.created_at,note:ev.note||""});
+  const existingEvent=state.events.find(x=>x.id===eventId);if(existingEvent){existingEvent.type=ev.event_type;existingEvent.projectId=projectLocalId;existingEvent.changeId=changeLocalId||null;existingEvent.at=ev.created_at;existingEvent.note=ev.note||"";}else state.events.push({id:eventId,type:ev.event_type,projectId:projectLocalId,changeId:changeLocalId||null,at:ev.created_at,note:ev.note||""});
  }
  // Rebuild each synced change timeline from authoritative cloud audit events.
  for(const c of (remoteChanges||[])){
-  const localId=Object.keys(m.changes).find(k=>m.changes[k]===c.id);
+  const localId=state.changes.find(x=>m.changes[x.id]===c.id)?.id||Object.keys(m.changes).find(k=>m.changes[k]===c.id);
   if(!localId)continue;
   const change=state.changes.find(x=>x.id===localId);
   if(!change)continue;
