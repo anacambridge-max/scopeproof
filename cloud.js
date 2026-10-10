@@ -60,6 +60,17 @@ async function sync(){
   const converted={id:localId,projectId:projectLocalId,title:c.title,description:c.description||"",price:Number(c.additional_price||0),hours:Number(c.estimated_hours||0),dueDate:c.revised_due_date||"",requestDate:c.requested_on||"",status:c.status,createdAt:c.created_at||new Date().toISOString(),history};
   const ix=state.changes.findIndex(x=>x.id===localId);if(ix>=0)state.changes[ix]=converted;else state.changes.push(converted);
  }
+ const {data:remoteEvents,error:eventError}=await client.from("scopeproof_approval_events").select("*").eq("owner_id",session.user.id).order("created_at",{ascending:true});
+ if(eventError)throw eventError;
+ for(const ev of (remoteEvents||[])){
+  const localEventId=Object.keys(m.events).find(k=>m.events[k]===ev.id);
+  const changeLocalId=ev.change_request_id?Object.keys(m.changes).find(k=>m.changes[k]===ev.change_request_id):null;
+  const projectLocalId=Object.keys(m.projects).find(k=>m.projects[k]===ev.project_id);
+  if(!projectLocalId)continue;
+  const eventId=localEventId||("e_cloud_"+ev.id);
+  m.events[eventId]=ev.id;
+  if(!state.events.some(x=>x.id===eventId))state.events.push({id:eventId,type:ev.event_type,projectId:projectLocalId,changeId:changeLocalId||null,at:ev.created_at,note:ev.note||""});
+ }
  saveMap(m);state.sample=false;window.ScopeProofApp.save();window.ScopeProofApp.renderAll();return session;
 }
 function openAuth(){ $("#cloudAuthMessage").textContent="";$("#cloudAuthDialog").showModal(); }
