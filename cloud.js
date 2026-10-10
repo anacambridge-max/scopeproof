@@ -6,7 +6,7 @@ const FN=URL+"/functions/v1/scopeproof-approval";
 const $=s=>document.querySelector(s);
 const client=window.supabase?.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const say=(m)=>{const el=$("#cloudAuthMessage");if(el)el.textContent=m;};
-const status=(signed,email)=>{const pill=$("#cloudStatusPill"),txt=$("#cloudStatusText");if(pill)pill.innerHTML='<span class="dot"></span> '+(signed?"Cloud account":"Local mode");if(txt)txt.textContent=signed?"Signed in as "+email+". Sync before creating client links.":"Sign in to create real client approval links and store project records.";$("#cloudSignOutBtn").hidden=!signed;$("#cloudSyncBtn").disabled=!signed;};
+const status=(signed,email)=>{const pill=$("#cloudStatusPill"),txt=$("#cloudStatusText"),notice=document.querySelector(".notice");if(pill)pill.innerHTML='<span class="dot"></span> '+(signed?"Cloud account":"Local mode");if(txt)txt.textContent=signed?"Signed in as "+email+". Sync before creating client links.":"Sign in to create real client approval links and store project records.";$("#cloudSignOutBtn").hidden=!signed;$("#cloudSyncBtn").disabled=!signed;if(notice){const h=notice.querySelector("strong"),p=notice.querySelector("p");if(h)h.textContent=signed?"Cloud account connected":"Prototype mode";if(p)p.textContent=signed?"Your browser data is not uploaded automatically. Click Sync to cloud before creating client approval links.":"Data stays in this browser. Demo approvals are simulated locally and are not shared with clients.";}};
 async function current(){if(!client)return null;const {data}=await client.auth.getSession();return data.session||null;}
 async function api(action,body,session){const res=await fetch(FN,{method:"POST",headers:{"Content-Type":"application/json","apikey":KEY,...(session?{Authorization:"Bearer "+session.access_token}:{})},body:JSON.stringify({action,...body})});const data=await res.json().catch(()=>({error:"Unexpected server response."}));if(!res.ok)throw new Error(data.error||"Request failed ("+res.status+").");return data;}
 function map(){try{return JSON.parse(localStorage.getItem("scopeproof_cloud_ids")||'{"projects":{},"changes":{},"events":{}}')}catch{return {projects:{},changes:{},events:{}}}}
@@ -71,10 +71,12 @@ async function sync(){
   m.events[eventId]=ev.id;
   if(!state.events.some(x=>x.id===eventId))state.events.push({id:eventId,type:ev.event_type,projectId:projectLocalId,changeId:changeLocalId||null,at:ev.created_at,note:ev.note||""});
  }
- saveMap(m);state.sample=false;window.ScopeProofApp.save();window.ScopeProofApp.renderAll();return session;
+ state.projects=state.projects.filter(p=>!String(p.id).startsWith("p_sample_"));state.changes=state.changes.filter(c=>!String(c.id).startsWith("c_sample_"));state.events=state.events.filter(e=>!["e1","e2","e3","e4"].includes(String(e.id))&&!String(e.projectId||"").startsWith("p_sample_"));saveMap(m);state.sample=false;window.ScopeProofApp.save();window.ScopeProofApp.renderAll();const notice=document.querySelector(".notice");if(notice){const h=notice.querySelector("strong"),p=notice.querySelector("p");if(h)h.textContent="Cloud sync ready";if(p)p.textContent="Your project data has synced to your account. Changes are synced when you use Sync to cloud; create a client approval link only after syncing."; }return session;
 }
 function openAuth(){ $("#cloudAuthMessage").textContent="";$("#cloudAuthDialog").showModal(); }
 async function signUp(){const f=new FormData($("#cloudAuthForm")),email=String(f.get("email")||"").trim(),password=String(f.get("password")||"");if(!email||password.length<8){say("Enter a valid email and a password of at least 8 characters.");return;}const {data,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:"https://anacambridge-max.github.io/scopeproof/"}});if(error)throw error;say(data.session?"Account created and signed in.":"Account created. Check your email for a confirmation link, then sign in.");}
+async function resendConfirmation(){const f=new FormData($("#cloudAuthForm")),email=String(f.get("email")||"").trim();if(!email){say("Enter your email address first.");return;}const {error}=await client.auth.resend({type:"signup",email,options:{emailRedirectTo:"https://anacambridge-max.github.io/scopeproof/"}});if(error)throw error;say("If this account needs confirmation, a fresh email has been sent. Open the newest email link promptly.");}
+async function handleAuthHash(){if(!location.hash||(!location.hash.includes("error_code=")&&!location.hash.includes("error=")))return;const params=new URLSearchParams(location.hash.slice(1)),code=params.get("error_code"),description=params.get("error_description");history.replaceState(null,"",location.pathname+location.search);if(code==="otp_expired"||code==="access_denied"){const s=await current();const message=code==="otp_expired"?"This confirmation link has expired. Enter your email above and click Resend confirmation, then open the newest email link.":(description?description.replace(/\+/g," "):"The email link could not be verified. Request a fresh confirmation email.");if(s){window.ScopeProofApp.toast("An earlier email link expired. You are signed in; try Sync to cloud.");}else{openAuth();say(message);}}}
 async function signIn(e){e.preventDefault();const f=new FormData(e.currentTarget),email=String(f.get("email")||"").trim(),password=String(f.get("password")||"");const {error}=await client.auth.signInWithPassword({email,password});if(error)throw error;$("#cloudAuthDialog").close();await refreshStatus();window.ScopeProofApp.toast("Signed in. Use Sync to cloud before creating an approval link.");}
 async function refreshStatus(){const s=await current();status(!!s,s?.user?.email||"");}
 async function createLink(cid){
@@ -102,12 +104,14 @@ async function clientApproval(){
 if(client){
  $("#cloudAccountBtn").addEventListener("click",openAuth);
  $("#cloudSignUpBtn").addEventListener("click",async()=>{try{await signUp()}catch(e){say(e.message)}});
+ $("#cloudResendBtn").addEventListener("click",async()=>{try{await resendConfirmation()}catch(e){say(e.message)}});
  $("#cloudAuthForm").addEventListener("submit",async e=>{try{await signIn(e)}catch(err){say(err.message)}});
  $("#cloudSignOutBtn").addEventListener("click",async()=>{await client.auth.signOut();await refreshStatus();});
  $("#cloudSyncBtn").addEventListener("click",async()=>{try{await sync();window.ScopeProofApp.toast("Cloud sync complete.");}catch(e){window.ScopeProofApp.toast("Cloud sync failed: "+(e.message||e));}});
  document.addEventListener("click",e=>{const b=e.target.closest("[data-cloud-link]");if(b){e.preventDefault();createLink(b.dataset.cloudLink);}});
  client.auth.onAuthStateChange(()=>{setTimeout(refreshStatus,0)});
  refreshStatus();
+ handleAuthHash().catch(e=>console.warn("Auth redirect handling failed",e));
  if(new URLSearchParams(location.search).has("approval"))clientApproval();
 }else{status(false,"");}
 })();
