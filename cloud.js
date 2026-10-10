@@ -74,7 +74,7 @@ async function sync(){
  saveMap(m);state.sample=false;window.ScopeProofApp.save();window.ScopeProofApp.renderAll();return session;
 }
 function openAuth(){ $("#cloudAuthMessage").textContent="";$("#cloudAuthDialog").showModal(); }
-async function signUp(){const f=new FormData($("#cloudAuthForm")),email=String(f.get("email")||"").trim(),password=String(f.get("password")||"");if(!email||password.length<8){say("Enter a valid email and a password of at least 8 characters.");return;}const {data,error}=await client.auth.signUp({email,password});if(error)throw error;say(data.session?"Account created and signed in.":"Account created. Check your email for a confirmation link, then sign in.");}
+async function signUp(){const f=new FormData($("#cloudAuthForm")),email=String(f.get("email")||"").trim(),password=String(f.get("password")||"");if(!email||password.length<8){say("Enter a valid email and a password of at least 8 characters.");return;}const {data,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:"https://anacambridge-max.github.io/scopeproof/"}});if(error)throw error;say(data.session?"Account created and signed in.":"Account created. Check your email for a confirmation link, then sign in.");}
 async function signIn(e){e.preventDefault();const f=new FormData(e.currentTarget),email=String(f.get("email")||"").trim(),password=String(f.get("password")||"");const {error}=await client.auth.signInWithPassword({email,password});if(error)throw error;$("#cloudAuthDialog").close();await refreshStatus();window.ScopeProofApp.toast("Signed in. Use Sync to cloud before creating an approval link.");}
 async function refreshStatus(){const s=await current();status(!!s,s?.user?.email||"");}
 async function createLink(cid){
