@@ -9,30 +9,29 @@ const say=(m)=>{const el=$("#cloudAuthMessage");if(el)el.textContent=m;};
 const status=(signed,email)=>{const pill=$("#cloudStatusPill"),txt=$("#cloudStatusText"),notice=document.querySelector(".notice");if(pill)pill.innerHTML='<span class="dot"></span> '+(signed?"Cloud account":"Local mode");if(txt)txt.textContent=signed?"Signed in as "+email+". Sync before creating client links.":"Sign in to create real client approval links and store project records.";$("#cloudSignOutBtn").hidden=!signed;$("#cloudSyncBtn").disabled=!signed;if(notice){const h=notice.querySelector("strong"),p=notice.querySelector("p");if(h)h.textContent=signed?"Cloud account connected":"Prototype mode";if(p)p.textContent=signed?"Your browser data is not uploaded automatically. Click Sync to cloud before creating client approval links.":"Data stays in this browser. Demo approvals are simulated locally and are not shared with clients.";}};
 async function current(){if(!client)return null;const {data}=await client.auth.getSession();return data.session||null;}
 async function api(action,body,session){const res=await fetch(FN,{method:"POST",headers:{"Content-Type":"application/json","apikey":KEY,...(session?{Authorization:"Bearer "+session.access_token}:{})},body:JSON.stringify({action,...body})});const data=await res.json().catch(()=>({error:"Unexpected server response."}));if(!res.ok)throw new Error(data.error||"Request failed ("+res.status+").");return data;}
-function map(){try{return JSON.parse(localStorage.getItem("scopeproof_cloud_ids")||'{"projects":{},"changes":{},"events":{}}')}catch{return {projects:{},changes:{},events:{}}}}
-function saveMap(m){localStorage.setItem("scopeproof_cloud_ids",JSON.stringify(m))}
+function map(uid){const key="scopeproof_cloud_ids_"+uid;try{return JSON.parse(localStorage.getItem(key)||'{"projects":{},"changes":{},"events":{}}')}catch{return {projects:{},changes:{},events:{}}}}
+function saveMap(m,uid){localStorage.setItem("scopeproof_cloud_ids_"+uid,JSON.stringify(m))}
 async function pushCloud(){
  const session=await current();if(!session)throw new Error("Sign in first.");
- const state=window.ScopeProofApp?.getState();if(!state)throw new Error("App is still loading.");
- const m=map(),uid=session.user.id;
+ const uid=session.user.id;let state=window.ScopeProofApp?.getState();if(!state)throw new Error("App is still loading.");const previousUser=localStorage.getItem("scopeproof_active_cloud_user");if(previousUser&&previousUser!==uid){state.projects=[];state.changes=[];state.events=[];state.sample=false;window.ScopeProofApp.save();window.ScopeProofApp.renderAll();}localStorage.setItem("scopeproof_active_cloud_user",uid);const m=map(uid);
  for(const p of state.projects.filter(x=>!String(x.id).startsWith("p_sample_"))){
   let dbid=m.projects[p.id];const row={owner_id:uid,name:p.name,client_name:p.client||"",currency:p.currency||"USD",original_price:Number(p.price||0),original_scope:p.scope||"",notes:p.notes||"",due_date:p.dueDate||null,updated_at:new Date().toISOString()};
   if(dbid){const {error}=await client.from("scopeproof_projects").update(row).eq("id",dbid);if(error)throw error;}
-  else{const {data,error}=await client.from("scopeproof_projects").insert(row).select("id").single();if(error)throw error;dbid=data.id;m.projects[p.id]=dbid;saveMap(m);}
+  else{const {data,error}=await client.from("scopeproof_projects").insert(row).select("id").single();if(error)throw error;dbid=data.id;m.projects[p.id]=dbid;saveMap(m,uid);}
  }
  for(const c of state.changes.filter(x=>!String(x.id).startsWith("c_sample_"))){
   const dbProject=m.projects[c.projectId];if(!dbProject)continue;
   let dbid=m.changes[c.id];const row={owner_id:uid,project_id:dbProject,title:c.title,description:c.description||"",additional_price:Number(c.price||0),estimated_hours:Number(c.hours||0),revised_due_date:c.dueDate||null,requested_on:c.requestDate||new Date().toISOString().slice(0,10),status:["pending","approved","declined","completed"].includes(c.status)?c.status:"pending",updated_at:new Date().toISOString()};
   if(dbid){const safeRow={...row};delete safeRow.status;const {error}=await client.from("scopeproof_change_requests").update(safeRow).eq("id",dbid);if(error)throw error;}
-  else{const {data,error}=await client.from("scopeproof_change_requests").insert(row).select("id").single();if(error)throw error;dbid=data.id;m.changes[c.id]=dbid;saveMap(m);}
+  else{const {data,error}=await client.from("scopeproof_change_requests").insert(row).select("id").single();if(error)throw error;dbid=data.id;m.changes[c.id]=dbid;saveMap(m,uid);}
  }
  for(const ev of state.events.filter(x=>!["e1","e2","e3","e4"].includes(String(x.id)))){
   if(m.events[ev.id])continue;
   const changeId=ev.changeId?m.changes[ev.changeId]:null, projectId=m.projects[ev.projectId];
   if(!projectId)continue;
-  const type=["created","link_created","approved","declined","completed"].includes(ev.type)?ev.type:"created";
+  const type=["created","link_created","pending","approved","declined","completed"].includes(ev.type)?ev.type:"created";
   const {data,error}=await client.from("scopeproof_approval_events").insert({owner_id:uid,project_id:projectId,change_request_id:changeId,event_type:type,note:ev.note||""}).select("id").single();
-  if(error)throw error;m.events[ev.id]=data.id;saveMap(m);
+  if(error)throw error;m.events[ev.id]=data.id;saveMap(m,uid);
  }
  return {session,m,state};
 }
@@ -46,7 +45,7 @@ async function sync(){
   const local={id:localId,name:p.name,client:p.client_name||"",currency:p.currency||"USD",price:Number(p.original_price||0),dueDate:p.due_date||"",scope:p.original_scope||"",notes:p.notes||"",createdAt:p.created_at||new Date().toISOString(),status:"active"};
   const ix=state.projects.findIndex(x=>x.id===localId);if(ix>=0)state.projects[ix]=local;else state.projects.push(local);
  }
- saveMap(m);
+ saveMap(m,uid);
  const {data:remoteChanges,error:changeError}=await client.from("scopeproof_change_requests").select("*").eq("owner_id",session.user.id);
  if(changeError)throw changeError;
  for(const c of (remoteChanges||[])){
@@ -71,7 +70,7 @@ async function sync(){
   m.events[eventId]=ev.id;
   if(!state.events.some(x=>x.id===eventId))state.events.push({id:eventId,type:ev.event_type,projectId:projectLocalId,changeId:changeLocalId||null,at:ev.created_at,note:ev.note||""});
  }
- state.projects=state.projects.filter(p=>!String(p.id).startsWith("p_sample_"));state.changes=state.changes.filter(c=>!String(c.id).startsWith("c_sample_"));state.events=state.events.filter(e=>!["e1","e2","e3","e4"].includes(String(e.id))&&!String(e.projectId||"").startsWith("p_sample_"));saveMap(m);state.sample=false;window.ScopeProofApp.save();window.ScopeProofApp.renderAll();const notice=document.querySelector(".notice");if(notice){const h=notice.querySelector("strong"),p=notice.querySelector("p");if(h)h.textContent="Cloud sync ready";if(p)p.textContent="Your project data has synced to your account. Changes are synced when you use Sync to cloud; create a client approval link only after syncing."; }return session;
+ state.projects=state.projects.filter(p=>!String(p.id).startsWith("p_sample_"));state.changes=state.changes.filter(c=>!String(c.id).startsWith("c_sample_"));state.events=state.events.filter(e=>!["e1","e2","e3","e4"].includes(String(e.id))&&!String(e.projectId||"").startsWith("p_sample_"));saveMap(m,uid);state.sample=false;window.ScopeProofApp.save();window.ScopeProofApp.renderAll();const notice=document.querySelector(".notice");if(notice){const h=notice.querySelector("strong"),p=notice.querySelector("p");if(h)h.textContent="Cloud sync ready";if(p)p.textContent="Your project data has synced to your account. Changes are synced when you use Sync to cloud; create a client approval link only after syncing."; }return session;
 }
 function openAuth(){ $("#cloudAuthMessage").textContent="";$("#cloudAuthDialog").showModal(); }
 async function signUp(){const f=new FormData($("#cloudAuthForm")),email=String(f.get("email")||"").trim(),password=String(f.get("password")||"");if(!email||password.length<8){say("Enter a valid email and a password of at least 8 characters.");return;}const {data,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:"https://anacambridge-max.github.io/scopeproof/"}});if(error)throw error;say(data.session?"Account created and signed in.":"Account created. Check your email for a confirmation link, then sign in.");}
