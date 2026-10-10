@@ -36,7 +36,7 @@ async function pushCloud(){
  return {session,m,state};
 }
 async function sync(){
- const {session,m,state}=await pushCloud();
+ const {session,m,state}=await pushCloud();const uid=session.user.id;
  const {data:remoteProjects,error:projectError}=await client.from("scopeproof_projects").select("*").eq("owner_id",session.user.id);
  if(projectError)throw projectError;
  for(const p of (remoteProjects||[])){
