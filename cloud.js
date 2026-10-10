@@ -79,13 +79,20 @@ async function resendConfirmation(){const f=new FormData($("#cloudAuthForm")),em
 async function handleAuthHash(){if(!location.hash||(!location.hash.includes("error_code=")&&!location.hash.includes("error=")))return;const params=new URLSearchParams(location.hash.slice(1)),code=params.get("error_code"),description=params.get("error_description");history.replaceState(null,"",location.pathname+location.search);if(code==="otp_expired"||code==="access_denied"){const s=await current();const message=code==="otp_expired"?"This confirmation link has expired. Enter your email above and click Resend confirmation, then open the newest email link.":(description?description.replace(/\+/g," "):"The email link could not be verified. Request a fresh confirmation email.");if(s){window.ScopeProofApp.toast("An earlier email link expired. You are signed in; try Sync to cloud.");}else{openAuth();say(message);}}}
 async function signIn(e){e.preventDefault();const f=new FormData(e.currentTarget),email=String(f.get("email")||"").trim(),password=String(f.get("password")||"");const {error}=await client.auth.signInWithPassword({email,password});if(error)throw error;$("#cloudAuthDialog").close();await refreshStatus();window.ScopeProofApp.toast("Signed in. Use Sync to cloud before creating an approval link.");}
 async function refreshStatus(){const s=await current();status(!!s,s?.user?.email||"");}
-async function createLink(cid){
- try{const session=await current();if(!session){openAuth();throw new Error("Sign in first, then create the link again.");}
- const {m,state}=await pushCloud(),dbid=m.changes[cid];if(!dbid)throw new Error("Request could not be synced.");
- const result=await api("create_link",{change_request_id:dbid},session);
- const html='<div class="modal-header"><div><span class="mini-label">CLIENT APPROVAL LINK</span><h2>Link ready to share</h2><p>Expires '+new Date(result.expires_at).toLocaleString()+'.</p></div><button class="icon-button" data-close="approvalDialog" aria-label="Close">×</button></div><p class="prose">Send this link to your client. They can review the request and approve or decline it without creating an account.</p><label>Secure approval URL<input id="generatedApprovalUrl" readonly value="'+result.approval_url.replace(/&/g,"&amp;").replace(/"/g,"&quot;")+'"></label><div class="modal-actions"><button class="button secondary" data-close="approvalDialog">Close</button><button class="button primary" id="copyApprovalUrlBtn">Copy link</button></div>';
- $("#approvalContent").innerHTML=html;$("#approvalDialog").showModal();$("#copyApprovalUrlBtn").onclick=async()=>{try{await navigator.clipboard.writeText(result.approval_url);window.ScopeProofApp.toast("Approval link copied.");}catch{$("#generatedApprovalUrl").select();document.execCommand("copy");window.ScopeProofApp.toast("Approval link copied.");}};
+const creatingLinks=new Set();
+async function createLink(cid,button){
+ if(creatingLinks.has(cid))return;
+ creatingLinks.add(cid);
+ const oldText=button?.textContent;
+ if(button){button.disabled=true;button.textContent="Creating link…";}
+ try{
+  const session=await current();if(!session){openAuth();throw new Error("Sign in first, then create the link again.");}
+  const {m}=await pushCloud(),dbid=m.changes[cid];if(!dbid)throw new Error("Request could not be synced.");
+  const result=await api("create_link",{change_request_id:dbid},session);
+  const html='<div class="modal-header"><div><span class="mini-label">CLIENT APPROVAL LINK</span><h2>Link ready to share</h2><p>Expires '+new Date(result.expires_at).toLocaleString()+'.</p></div><button class="icon-button" data-close="approvalDialog" aria-label="Close">×</button></div><p class="prose">Send this link to your client. They can review the request and approve or decline it without creating an account.</p><label>Secure approval URL<input id="generatedApprovalUrl" readonly value="'+result.approval_url.replace(/&/g,"&amp;").replace(/"/g,"&quot;")+'"></label><div class="modal-actions"><button class="button secondary" data-close="approvalDialog">Close</button><button class="button primary" id="copyApprovalUrlBtn">Copy link</button></div>';
+  $("#approvalContent").innerHTML=html;$("#approvalDialog").showModal();$("#copyApprovalUrlBtn").onclick=async()=>{try{await navigator.clipboard.writeText(result.approval_url);window.ScopeProofApp.toast("Approval link copied.");}catch{$("#generatedApprovalUrl").select();document.execCommand("copy");window.ScopeProofApp.toast("Approval link copied.");}};
  }catch(e){window.ScopeProofApp?.toast(e.message||"Could not create link.");}
+ finally{creatingLinks.delete(cid);if(button&&button.isConnected){button.disabled=false;button.textContent=oldText||"Create client approval link";}}
 }
 async function clientApproval(){
  const token=new URLSearchParams(location.search).get("approval");if(!token)return;
@@ -108,7 +115,7 @@ if(client){
  $("#cloudAuthForm").addEventListener("submit",async e=>{try{await signIn(e)}catch(err){say(err.message)}});
  $("#cloudSignOutBtn").addEventListener("click",async()=>{await client.auth.signOut();await refreshStatus();});
  $("#cloudSyncBtn").addEventListener("click",async()=>{try{await sync();window.ScopeProofApp.toast("Cloud sync complete.");}catch(e){window.ScopeProofApp.toast("Cloud sync failed: "+(e.message||e));}});
- document.addEventListener("click",e=>{const b=e.target.closest("[data-cloud-link]");if(b){e.preventDefault();createLink(b.dataset.cloudLink);}});
+ document.addEventListener("click",e=>{const b=e.target.closest("[data-cloud-link]");if(b){e.preventDefault();if(b.disabled)return;createLink(b.dataset.cloudLink,b);}});
  client.auth.onAuthStateChange(()=>{setTimeout(refreshStatus,0)});
  refreshStatus();
  handleAuthHash().catch(e=>console.warn("Auth redirect handling failed",e));
